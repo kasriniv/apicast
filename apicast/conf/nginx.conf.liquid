@@ -7,7 +7,7 @@ env OPENSSL_VERIFY;
 
 {% for env in env -%}
   {%- if env.name | starts_with: 'APICAST_', 'THREESCALE_' %}
-    env {{ env.name }};
+    env {{ env.name }}={{ env.value }};
   {%- endif -%}
 {%- endfor %}
 

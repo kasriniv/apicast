@@ -7,7 +7,15 @@ use v5.10.1;
 use lib 't';
 use TestAPIcast  -Base;
 use File::Copy "move";
+use File::Temp qw/ tempfile /;
 
+add_block_preprocessor(sub {
+    my $block = shift;
+    my $seq = $block->seq_num;
+    my $name = $block->name;
+
+    $block->set_value("config", "$name ($seq)");
+});
 
 sub Test::Nginx::Util::write_config_file ($$) {
     my ($block, $config) = @_;
@@ -22,6 +30,10 @@ sub Test::Nginx::Util::write_config_file ($$) {
     my $AccLogFile = $Test::Nginx::Util::AccLogFile;
     my $ServerPort = $Test::Nginx::Util::ServerPort;
 
+    my ($conf, $configuration) = tempfile();
+    print $conf $block->configuration;
+    close $conf;
+
     open my $out, ">apicast/config/test.lua" or Test::Nginx::Util::bail_out "Can't open $ConfFile for writing: $!\n";
 
     print $out <<_EOC_;
@@ -35,11 +47,12 @@ return {
     lua_code_cache = 'on',
     access_log = '$AccLogFile',
     port = { apicast = '$ServerPort' },
+    env = { APICAST_CONFIGURATION = 'file://$configuration', APICAST_CONFIGURATION_LOADER = 'boot' },
 }
 _EOC_
     close $out;
 
-    my $apicast = `bin/apicast --test --environment test 2>&1`;
+    my $apicast = `bin/apicast --boot --test --environment test --configuration $configuration 2>&1`;
     if ($apicast =~ /configuration file (?<file>.+?) test is successful/)
     {
         move($+{file}, $Test::Nginx::Util::ConfFile);
